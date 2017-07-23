@@ -6,9 +6,9 @@ import getpass
 import logging
 
 from boards import boards
+from src.crawlers import FreeElectronsCrawler, KernelCICrawler
+from src.crawlers import RemoteAccessError
 from jinja2 import FileSystemLoader, Environment
-
-from utils import ArtifactsFinder
 
 REMOTE_ROOT = os.path.join("/tmp/ctt/", getpass.getuser())
 TEMPLATE_FOLDER = "jobs_templates"
@@ -21,6 +21,7 @@ class JobCrafter:
     def __init__(self, board, cfg):
         self.board = boards[board]
         self.cfg = cfg
+        self.crawlers = [KernelCICrawler(cfg), FreeElectronsCrawler(cfg)]
         self.job = {
                 "kernel": "",
                 "device_tree": "",
@@ -180,17 +181,16 @@ class JobCrafter:
                 # Go fetch remote artifacts
                 # data is already populated if we have a user supplied kernel
                 if not 'kernel' in self.cfg:
+                    tree, branch, defconfig = config.split('/')
                     data = None
 
-                    for url in ("http://lava.free-electrons.com/downloads/builds/",
-                                "https://storage.kernelci.org/"):
-                        finder = ArtifactsFinder(self.cfg, url)
+                    for crawler in self.crawlers:
                         try:
-                            data = finder.crawl(self.board, config)
+                            data = crawler.crawl(self.board, tree, branch, defconfig)
                             # If we don't get any exception, then we've got what we want
                             break
-                        except IOError:
-                            logging.debug("Didn't find the artifacts on server %s" % url)
+                        except RemoteAccessError:
+                            logging.debug('Didn\'t find the artifacts on current crawler..')
 
                     if data is None:
                         logging.warning("No artifacts available, skipping")
