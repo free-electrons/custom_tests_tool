@@ -6,89 +6,11 @@ import xmlrpc.client
 import ssl
 
 import os
-import argparse
-import configparser
 import logging
 
 import sys
-import re
-
-import requests
 
 import paramiko
-
-parse_re = re.compile('href="([^./"?][^"?]*)/"')
-
-class ArtifactsFinder():
-
-    def __init__(self, cfg, root_url, *args):
-        self.cfg = cfg
-        self.root_url = root_url
-
-    def get_image_name(board):
-        if board['arch'] == 'arm':
-            return "zImage"
-        elif board['arch'] == 'arm64':
-            return "Image"
-        return "unknownImage"
-
-    def get_latest_release(self):
-        if "kernelci" in self.root_url: # KernelCI's case
-            try:
-                r = requests.get("https://api.kernelci.org/build?limit=1&job=%s&field=kernel&sort=created_on&git_branch=%s" % (self.tree, self.branch),
-                                 headers={'Authorization': self.cfg['api_token']})
-                r.raise_for_status()
-                return r.json()['result'][0]['kernel']
-            except IndexError:
-                raise IOError
-        else:
-            if self.root_url.startswith("http"):
-                r = requests.get("/".join([self.root_url, self.tree,
-                                           self.branch, "latest"]))
-                return r.text
-            else:
-                with open(os.path.join(self.root_url, self.tree,
-                                       self.branch, "latest")) as f:
-                    return f.read().strip()
-
-    def get_latest_full_url(self):
-        return self.root_url + self.tree + "/" + self.branch + "/" + self.get_latest_release()
-
-    def crawl(self, board, config):
-        logging.debug("Crawling %s for %s (%s)" % (self.root_url, board['name'],
-                                                   config))
-        (self.tree, self.branch, defconfig) = config.split('/')
-        url = self.get_latest_full_url()
-        url = '/'.join([url, board['arch']])
-        if not url.endswith('/'):
-            url += "/"
-        if url.startswith("http"):
-            try:
-                html = urllib.request.urlopen(url).read().decode('utf-8')
-                files = parse_re.findall(html)
-            except urllib.error.HTTPError as e:
-                logging.error(repr(e))
-                return
-        else: # It seems we have a local defconfig to find
-            try:
-                files = [f.name for f in os.scandir(url)]
-                url = "file://" + url
-            except Exception as e:
-                logging.error(repr(e))
-                raise e
-        for name in files:
-            if defconfig == name:
-                logging.debug("Found a kernel for %s in %s" % (board["name"],
-                                                               url + name))
-                common_url = url + name + '/'
-                return {
-                        'kernel': common_url + ArtifactsFinder.get_image_name(board),
-                        'dtb': common_url + 'dtbs/' + board['dt'] + '.dtb',
-                        'modules': common_url + 'modules.tar.xz',
-                        }
-
-        logging.debug("Nothing found at address %s" % (url))
-        raise IOError
 
 def get_connection(cfg):
     u = urllib.parse.urlparse(cfg['server'])
