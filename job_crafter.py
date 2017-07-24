@@ -8,6 +8,7 @@ import logging
 from boards import boards
 from src.crawlers import FreeElectronsCrawler, KernelCICrawler
 from src.crawlers import RemoteAccessError
+from src.writers import FileWriter, LavaWriter
 from jinja2 import FileSystemLoader, Environment
 
 REMOTE_ROOT = os.path.join("/tmp/ctt/", getpass.getuser())
@@ -36,64 +37,15 @@ class JobCrafter:
                 "notify": [],
                 }
         self.jinja_env = Environment(loader=FileSystemLoader(os.path.dirname(__file__)))
-
-    def get_device_status(self):
-        try:
-            return self._device_status
-        except:
-            conn = utils.get_connection(self.cfg)
-            board = "%s_01" % self.board["device_type"]
-            self._device_status = conn.scheduler.get_device_status(board)
-            return self._device_status
+        if self.cfg['no_send']:
+            self.writer = FileWriter(self.cfg)
+        else:
+            self.writer = LavaWriter(self.cfg)
 
 # Template handling
     def get_template_from_file(self, file):
         logging.debug("template: using %s" % file)
         self.job_template = self.jinja_env.get_template(file)
-
-    def save_job_to_file(self, ext="yaml"):
-        try:
-            os.makedirs(self.cfg['output_dir'])
-        except:
-            pass
-
-        file = os.path.join(self.cfg['output_dir'],
-                            self.job["job_name"] + "." + ext)
-
-        with open(file, 'w') as f:
-            f.write(self.job_template.render(self.job))
-
-        logging.info("  ==> Job file saved to %s" % file)
-
-    def send_to_lava(self):
-        try:
-            dev = self.get_device_status()
-            if dev["status"] == "offline":
-                logging.error("Device is offline, not sending the job")
-                return
-        except Exception as e:
-            logging.error('Not sending the job: %s' % e)
-            return
-
-        logging.debug("Sending to LAVA")
-
-        job_str = self.job_template.render(self.job)
-
-        #
-        # submit_job can return either an int (if there's one element)
-        # or a list of them (if it's a multinode job).
-        # This is crappy, but the least crappy way to handle this.
-        #
-        ret = utils.get_connection(self.cfg).scheduler.submit_job(job_str)
-        try:
-            for r in ret:
-                logging.debug("Job sent (id: %s)" % r)
-                logging.info("  ==> Job URL: %s/scheduler/job/%s" %
-                             (self.cfg['web_ui_address'], r))
-        except TypeError:
-            logging.debug("Job sent (id: %s)" % ret)
-            logging.info("  ==> Job URL: %s/scheduler/job/%s" %
-                         (self.cfg['web_ui_address'], ret))
 
 # Job handling
     def make_jobs(self):
@@ -232,11 +184,10 @@ class JobCrafter:
                     self.job["job_name"] = job_name
                 logging.debug("    Job name: %s" % self.job['modules'])
 
-                # Complete job creation
-                if self.cfg['no_send']:
-                    self.save_job_to_file()
-                else:
-                    self.send_to_lava()
+                out = self.writer.write(self.board, job_name,
+                                        self.job_template.render(self.job))
+                for output in out:
+                    logging.info('  ==> Job saved to: %s' % output)
 
     def override(self, key, value):
         logging.debug('Overriding key "%s" with value "%s"' % (key, value))
