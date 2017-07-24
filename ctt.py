@@ -60,8 +60,8 @@ def main(**kwargs):
             h.make_jobs()
         except IOError:
             sys.exit(1)
-        except Exception as e:
-            logging.error(repr(e))
+        except Exception:
+            logging.exception('Error')
 
 if __name__ == "__main__":
     main()
