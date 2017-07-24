@@ -1,36 +1,9 @@
-import urllib.request
-import urllib.error
-import urllib.parse
-
-import xmlrpc.client
-import ssl
-
 import os
 import logging
 
 import sys
 
 import paramiko
-
-def get_connection(cfg):
-    u = urllib.parse.urlparse(cfg['server'])
-    url = "%s://%s:%s@%s/RPC2" % (u.scheme,
-                                  cfg['username'],
-                                  cfg['token'],
-                                  u.netloc)
-
-    # Taken from Lavabo: https://github.com/free-electrons/lavabo/blob/master/utils.py#L88
-    try:
-        if 'https' == u.scheme:
-            context = hasattr(ssl, '_create_unverified_context') and ssl._create_unverified_context() or None
-            connection = xmlrpc.client.ServerProxy(url,
-                    transport=xmlrpc.client.SafeTransport(use_datetime=True, context=context))
-        else:
-            connection = xmlrpc.client.ServerProxy(url)
-        return connection
-    except (xmlrpc.client.ProtocolError, xmlrpc.client.Fault, IOError) as e:
-        logging.error("Unable to connect to %s" % url)
-        sys.exit(1)
 
 # The next three function are borrowed from Lavabo, thx Oleil! :)
 def get_hostkey(hostname):
