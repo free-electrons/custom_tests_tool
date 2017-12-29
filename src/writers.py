@@ -80,19 +80,12 @@ class LavaWriter(Writer):
         except xmlrpc.client.Error:
             raise UnavailableError('LAVA device is offline')
 
-    def __get_device_status(self, device):
+    def query_device_status(self, device):
         board = "%s_01" % device
 
         return self._con.scheduler.get_device_status(board)
 
     def write(self, board, name, job):
-        dev = self.__get_device_status(board['device_type'])
-        if dev['status'] == "offline":
-            logging.error("Device is offline, not sending the job")
-            raise UnavailableError('LAVA device is offline')
-        elif dev['status'] == "retired":
-            logging.error("Device is retired, not sending the job")
-            raise UnavailableError('LAVA device is retired')
 
         value = list()
         #
