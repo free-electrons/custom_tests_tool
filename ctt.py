@@ -50,6 +50,32 @@ class CTTLauncher(BaseLauncher):
             scp.put(local, remote)
         logging.info('  File %s sent' % local)
 
+    def poll(self, all_jobs):
+        statuses = self.crafter.wait_jobs(all_jobs)
+        has_canceled = False
+        has_failed = False
+        for job_id, status in statuses.items():
+            # Canceled (4) or Canceling (5).
+            if status == 4 or status == 5:
+                has_canceled = True
+            # Incomplete (3).
+            if status == 3:
+                has_failed = True
+
+        # If at least one job has been canceled, we can't conclude on
+        # the result of the test, use special exit code 2 for this
+        # situation.
+        if has_canceled:
+            logging.error("At least one job has been canceled")
+            return 2
+        # At least one job has failed, consider the entire test has
+        # failed.
+        elif has_failed:
+            logging.error("At least one job has failed")
+            return 1
+        else:
+            logging.info("All jobs successful")
+            return 0
 
     # Launcher
     def launch(self):
@@ -58,6 +84,7 @@ class CTTLauncher(BaseLauncher):
             for b in sorted(self._boards_config):
                 print("  - %s" % b)
             return
+        all_jobs = list()
         for board in self._cfg['boards']:
             logging.info(board)
 
@@ -96,8 +123,13 @@ class CTTLauncher(BaseLauncher):
 
                 logging.info("  Making %s job" % test)
                 job_name = "%s--custom_kernel--%s" % (board, test)
-                self.crafter.make_jobs(board, artifacts, test, job_name)
+                jobs = self.crafter.make_jobs(board, artifacts, test, job_name)
+                if jobs:
+                    all_jobs += jobs
+        if self._cfg['poll']:
+            return self.poll(all_jobs)
+        else:
+            return 0
 
 if __name__ == "__main__":
-    CTTLauncher().launch()
-
+    sys.exit(CTTLauncher().launch())

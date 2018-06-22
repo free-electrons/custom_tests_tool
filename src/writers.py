@@ -2,7 +2,7 @@ import logging
 import os
 import urllib
 import xmlrpc.client
-
+import time
 
 class BaseError(Exception):
     pass
@@ -103,10 +103,17 @@ class LavaWriter(Writer):
         ret = self._con.scheduler.submit_job(job)
         try:
             for r in ret:
-                value.append('%s/scheduler/job/%s' %
-                             (self._cfg['web_ui_address'], r))
+                value.append(r)
         except TypeError:
-            value.append('%s/scheduler/job/%s' %
-                         (self._cfg['web_ui_address'], ret))
+            value.append(ret)
 
         return value
+
+    def wait(self, job_id):
+        while True:
+            job_list = self._con.results.make_custom_query("testjob",
+                                                           "testjob__id__exact__%s" % job_id)
+            job = job_list[0]
+            if job['status'] != 0 and job['status'] != 1:
+                return job['status']
+            time.sleep(30)

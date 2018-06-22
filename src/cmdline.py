@@ -110,6 +110,7 @@ class CTTCmdline(BaseCmdline):
         job.add_argument('--dtb', help='Path to your dtb')
         job.add_argument('--dtb-folder', help='Path to your dtb folder')
         job.add_argument('--modules', help='Path to your modules tar.gz')
+        job.add_argument('--poll', action='store_true', help='Poll until the jobs results are available')
         job.add_argument('-t', '--tests', nargs='+',
                          help='Tests to run on the board')
 
