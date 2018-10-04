@@ -58,6 +58,9 @@ class JobCrafter(object):
         else:
             self.writer = LavaWriter(self._cfg)
 
+    def get_device_status(self, device):
+        return self.writer.query_device_status(device)
+
 # Template handling
     def get_template_from_file(self, file):
         logging.debug("    Template: %s" % file)

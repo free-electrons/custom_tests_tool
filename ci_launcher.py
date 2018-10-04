@@ -48,6 +48,15 @@ class CILauncher(BaseLauncher):
             if not self._tests_config[board]['tests']:
                 logging.info("  No test set")
 
+            # Retrieve the device status
+            dev = self.crafter.get_device_status(board)
+            if dev['status'] == "offline":
+                logging.error("Device is offline, not sending jobs")
+                continue
+            elif dev['status'] == "retired":
+                logging.error("Device is retired, not sending jobs")
+                continue
+
             try:
                 rootfs = RootfsChooser().get_url(self._boards_config[board])
             except RootfsAccessError as e:
